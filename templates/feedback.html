@@ -171,24 +171,20 @@
                 </div>
                 
                 <div class="card-footer text-end">
-                    {% if loop.index0 > 0 %}
-                    <button type="button" class="btn btn-outline-secondary" onclick="previousTrack({{ loop.index0 }})">
-                        <i class="fas fa-arrow-left"></i> Previous
-                    </button>
-                    {% endif %}
-                    
-                    {% if loop.index0 < seed_tracks|length - 1 %}
-                    <button type="button" class="btn btn-primary" onclick="nextTrack({{ loop.index0 }})">
-                        Next <i class="fas fa-arrow-right"></i>
-                    </button>
-                    {% else %}
-                    <button type="button" class="btn btn-success" onclick="submitFeedback()">
-                        <i class="fas fa-magic"></i> Generate Recommendations
-                    </button>
-                    {% endif %}
+                    <!-- Track {{ loop.index0 + 1 }} of {{ seed_tracks|length }} -->
                 </div>
             </div>
             {% endfor %}
+            
+            <!-- Submit All Feedback Button -->
+            <div class="text-center mt-4 mb-5">
+                <button type="button" class="btn btn-success btn-lg" onclick="submitFeedback()">
+                    <i class="fas fa-magic"></i> Generate My Recommendations
+                </button>
+                <p class="text-muted mt-2">
+                    <small>Click when you've completed feedback for all tracks</small>
+                </p>
+            </div>
         </form>
     </div>
 </div>
@@ -267,26 +263,7 @@ document.querySelectorAll('.mood-emoji').forEach(emoji => {
     });
 });
 
-// Navigation functions
-function nextTrack(currentIndex) {
-    console.log(`🔄 Next button clicked for track ${currentIndex}`);
-    
-    if (validateCurrentTrack(currentIndex)) {
-        console.log(`✅ Validation passed for track ${currentIndex}`);
-        document.getElementById(`track-${currentIndex}`).style.display = 'none';
-        document.getElementById(`track-${currentIndex + 1}`).style.display = 'block';
-        currentTrack = currentIndex + 1;
-        updateProgress();
-    } else {
-        console.log(`❌ Validation failed for track ${currentIndex}`);
-    }
-}
-
-function previousTrack(currentIndex) {
-    document.getElementById(`track-${currentIndex}`).style.display = 'none';
-    document.getElementById(`track-${currentIndex - 1}`).style.display = 'block';
-    currentTrack = currentIndex - 1;
-}
+// All tracks are shown simultaneously - no individual navigation needed
 
 function validateCurrentTrack(trackIndex) {
     const moodInput = document.getElementById(`mood_${trackIndex}`);
@@ -348,7 +325,7 @@ function updateProgress() {
     
     const progress = (completedTracks / totalTracks) * 100;
     document.getElementById('feedback-progress').style.width = `${progress}%`;
-    document.getElementById('progress-text').textContent = `${completedTracks} of ${totalTracks} tracks`;
+    document.getElementById('progress-text').textContent = `${completedTracks} of ${totalTracks} tracks completed`;
 }
 
 
