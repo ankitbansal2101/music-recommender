@@ -239,9 +239,17 @@ document.querySelectorAll('.mood-emoji').forEach(emoji => {
         const hiddenInput = document.getElementById(`mood_${trackIndex}`);
         if (hiddenInput) {
             hiddenInput.value = mood;
-            console.log(`Set hidden input value: ${hiddenInput.value}`); // Debug
+            console.log(`✅ Set hidden input mood_${trackIndex} to: "${hiddenInput.value}"`); // Debug
+            
+            // Double-check by reading it back
+            setTimeout(() => {
+                const checkValue = document.getElementById(`mood_${trackIndex}`).value;
+                console.log(`🔍 Verification - mood_${trackIndex} value is: "${checkValue}"`);
+            }, 100);
         } else {
-            console.error(`Hidden input mood_${trackIndex} not found`);
+            console.error(`❌ Hidden input mood_${trackIndex} not found!`);
+            console.log('Available mood inputs:', 
+                Array.from(document.querySelectorAll('[id^="mood_"]')).map(el => el.id));
         }
         
         // Show brief confirmation for manual emoji selection
@@ -261,11 +269,16 @@ document.querySelectorAll('.mood-emoji').forEach(emoji => {
 
 // Navigation functions
 function nextTrack(currentIndex) {
+    console.log(`🔄 Next button clicked for track ${currentIndex}`);
+    
     if (validateCurrentTrack(currentIndex)) {
+        console.log(`✅ Validation passed for track ${currentIndex}`);
         document.getElementById(`track-${currentIndex}`).style.display = 'none';
         document.getElementById(`track-${currentIndex + 1}`).style.display = 'block';
         currentTrack = currentIndex + 1;
         updateProgress();
+    } else {
+        console.log(`❌ Validation failed for track ${currentIndex}`);
     }
 }
 
@@ -276,10 +289,16 @@ function previousTrack(currentIndex) {
 }
 
 function validateCurrentTrack(trackIndex) {
-    const mood = document.getElementById(`mood_${trackIndex}`).value;
+    const moodInput = document.getElementById(`mood_${trackIndex}`);
+    const mood = moodInput ? moodInput.value : '';
     const context = document.querySelector(`[name="context_${trackIndex}"]`).value;
     
-    console.log(`Validating track ${trackIndex}:`, { mood, context }); // Debug
+    console.log(`Validating track ${trackIndex}:`, { 
+        mood, 
+        context, 
+        moodInputExists: !!moodInput,
+        moodInputValue: moodInput ? moodInput.value : 'NOT_FOUND'
+    }); // Enhanced debug
     
     let missingFields = [];
     
