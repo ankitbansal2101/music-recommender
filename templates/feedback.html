@@ -22,7 +22,7 @@
 
         <form id="feedback-form">
             {% for track in seed_tracks %}
-            <div class="card track-card fade-in" id="track-{{ loop.index0 }}" style="{% if loop.index0 > 0 %}display: none;{% endif %}">
+            <div class="card track-card fade-in mb-4" id="track-{{ loop.index0 }}" style="{% if loop.index0 != 0 %}display: none;{% endif %}">
                 <div class="card-header">
                     <div class="row align-items-center">
                         <div class="col-md-8">
@@ -75,7 +75,7 @@
                                             </div>
                                         </div>
                                         
-                                        <audio id="audio-{{ loop.index0 }}" preload="metadata" onloadedmetadata="updateDuration({{ loop.index0 }})" ontimeupdate="updateProgress({{ loop.index0 }})">
+                                        <audio id="audio-{{ loop.index0 }}" preload="metadata" onloadedmetadata="updateDuration({{ loop.index0 }})" ontimeupdate="updateAudioProgress({{ loop.index0 }})">
                                             <source src="/static/audio/{{ track.track_id|string|string + '.mp3' }}" type="audio/mpeg">
                                             <p class="text-warning">Your browser doesn't support audio playback. Track ID: {{ track.track_id }}</p>
                                         </audio>
@@ -110,13 +110,15 @@
                         <div class="col-md-6">
                             <h6><i class="fas fa-smile"></i> How does this track make you feel?</h6>
                             <div class="mood-selector mb-3">
+                                {% set outer_loop = loop %}
                                 {% for mood, emoji in mood_emojis.items() %}
-                                <span class="mood-emoji" data-mood="{{ mood }}" data-track="{{ loop.index0 }}" title="{{ mood.title() }}">
-                                    {{ emoji }}
-                                </span>
+                                <label class="mood-option">
+                                    <input type="radio" name="mood_{{ outer_loop.index0 }}" value="{{ mood }}" required>
+                                    <span class="mood-emoji-radio">{{ emoji }}</span>
+                                    <small class="mood-label">{{ mood.title() }}</small>
+                                </label>
                                 {% endfor %}
                             </div>
-                            <input type="hidden" name="mood_{{ loop.index0 }}" id="mood_{{ loop.index0 }}" required>
                         </div>
 
                         <!-- Context Selection -->
@@ -170,21 +172,40 @@
                     <input type="hidden" name="track_id_{{ loop.index0 }}" value="{{ track.track_id }}">
                 </div>
                 
-                <div class="card-footer text-end">
-                    <!-- Track {{ loop.index0 + 1 }} of {{ seed_tracks|length }} -->
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <!-- Previous Button -->
+                        <div>
+                            {% if loop.index0 > 0 %}
+                            <button type="button" class="btn btn-outline-secondary" onclick="previousTrack({{ loop.index0 }})">
+                                <i class="fas fa-arrow-left"></i> Previous
+                            </button>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Track Counter -->
+                        <div class="text-center">
+                            <span class="badge bg-primary">Track {{ loop.index }} of {{ seed_tracks|length }}</span>
+                        </div>
+                        
+                        <!-- Next/Submit Button -->
+                        <div>
+                            {% if loop.index0 < seed_tracks|length - 1 %}
+                            <button type="button" class="btn btn-primary" onclick="nextTrack({{ loop.index0 }})">
+                                Next <i class="fas fa-arrow-right"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-success" onclick="submitFeedback()">
+                                <i class="fas fa-magic"></i> Generate Recommendations
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
             {% endfor %}
             
-            <!-- Submit All Feedback Button -->
-            <div class="text-center mt-4 mb-5">
-                <button type="button" class="btn btn-success btn-lg" onclick="submitFeedback()">
-                    <i class="fas fa-magic"></i> Generate My Recommendations
-                </button>
-                <p class="text-muted mt-2">
-                    <small>Click when you've completed feedback for all tracks</small>
-                </p>
-            </div>
+
         </form>
     </div>
 </div>
@@ -212,70 +233,80 @@ let currentTrack = 0;
 const totalTracks = {{ seed_tracks|length }};
 let completedTracks = 0;
 
+console.log(`📊 Total tracks expected: ${totalTracks}`);
+console.log('🎵 All available mood inputs on page load:', 
+    Array.from(document.querySelectorAll('[id^="mood_"]')).map(el => el.id));
+console.log('🎵 All track cards on page:', 
+    Array.from(document.querySelectorAll('[id^="track-"]')).map(el => el.id));
+console.log('🎵 All track_id inputs on page:', 
+    Array.from(document.querySelectorAll('[name^="track_id_"]')).map(el => el.name));
+console.log('🎵 All mood radio buttons on page:', 
+    Array.from(document.querySelectorAll('input[type="radio"][name^="mood_"]')).map(el => el.name));
+
 // Update rating display
 function updateRatingDisplay(trackIndex, value) {
     document.getElementById(`rating-display-${trackIndex}`).textContent = value;
 }
 
-// Mood selection
-document.querySelectorAll('.mood-emoji').forEach(emoji => {
-    emoji.addEventListener('click', function() {
-        const mood = this.dataset.mood;
-        const trackIndex = this.dataset.track;
+// Radio buttons handle mood selection automatically - no custom JavaScript needed!
+console.log('✨ Using radio buttons for reliable emoji selection');
+
+// Add change listeners to radio buttons for immediate feedback
+document.addEventListener('change', function(e) {
+    if (e.target.type === 'radio' && e.target.name.startsWith('mood_')) {
+        const trackIndex = parseInt(e.target.name.split('_')[1]); // Parse as integer
+        const mood = e.target.value;
+        console.log(`✅ RADIO CHANGED: Track Index ${trackIndex}, Mood: ${mood}`);
         
-        console.log(`Selected mood: ${mood} for track ${trackIndex}`); // Debug
-        
-        // Clear previous selections for this track
-        document.querySelectorAll(`[data-track="${trackIndex}"]`).forEach(e => e.classList.remove('selected'));
-        
-        // Select this emoji
-        this.classList.add('selected');
-        
-        // Set the hidden input value
-        const hiddenInput = document.getElementById(`mood_${trackIndex}`);
-        if (hiddenInput) {
-            hiddenInput.value = mood;
-            console.log(`✅ Set hidden input mood_${trackIndex} to: "${hiddenInput.value}"`); // Debug
-            
-            // Double-check by reading it back
-            setTimeout(() => {
-                const checkValue = document.getElementById(`mood_${trackIndex}`).value;
-                console.log(`🔍 Verification - mood_${trackIndex} value is: "${checkValue}"`);
-            }, 100);
-        } else {
-            console.error(`❌ Hidden input mood_${trackIndex} not found!`);
-            console.log('Available mood inputs:', 
-                Array.from(document.querySelectorAll('[id^="mood_"]')).map(el => el.id));
-        }
-        
-        // Show brief confirmation for manual emoji selection
-        const moodSelector = document.querySelector(`#track-${trackIndex} .mood-selector`);
-        if (moodSelector) {
-            moodSelector.style.backgroundColor = '#d1ecf1';
-            moodSelector.style.border = '2px solid #17a2b8';
-            setTimeout(() => {
-                moodSelector.style.backgroundColor = '';
-                moodSelector.style.border = '';
-            }, 1000);
-        }
+        // Test: Can we find this radio button?
+        const testRadio = document.querySelector(`input[name="mood_${trackIndex}"]:checked`);
+        console.log(`🧪 Test - Can find checked radio for mood_${trackIndex}:`, testRadio ? testRadio.value : 'NOT_FOUND');
         
         updateProgress();
-    });
+    }
 });
 
-// All tracks are shown simultaneously - no individual navigation needed
+// Navigation functions for one-track-per-page
+function nextTrack(currentIndex) {
+    console.log(`🔄 Moving from track ${currentIndex} to ${currentIndex + 1}`);
+    console.log(`🔍 About to validate track index: ${currentIndex}`);
+    
+    // Validate current track before moving
+    if (!validateCurrentTrack(currentIndex)) {
+        return; // Stop if validation fails
+    }
+    
+    // Hide current track
+    document.getElementById(`track-${currentIndex}`).style.display = 'none';
+    
+    // Show next track
+    document.getElementById(`track-${currentIndex + 1}`).style.display = 'block';
+    
+    updateProgress();
+}
+
+function previousTrack(currentIndex) {
+    console.log(`🔄 Moving from track ${currentIndex} to ${currentIndex - 1}`);
+    
+    // Hide current track
+    document.getElementById(`track-${currentIndex}`).style.display = 'none';
+    
+    // Show previous track
+    document.getElementById(`track-${currentIndex - 1}`).style.display = 'block';
+    
+    updateProgress();
+}
 
 function validateCurrentTrack(trackIndex) {
-    const moodInput = document.getElementById(`mood_${trackIndex}`);
-    const mood = moodInput ? moodInput.value : '';
-    const context = document.querySelector(`[name="context_${trackIndex}"]`).value;
+    // Get the selected mood (radio button)
+    const moodRadio = document.querySelector(`input[name="mood_${trackIndex}"]:checked`);
+    const mood = moodRadio ? moodRadio.value.trim() : '';
     
-    console.log(`Validating track ${trackIndex}:`, { 
-        mood, 
-        context, 
-        moodInputExists: !!moodInput,
-        moodInputValue: moodInput ? moodInput.value : 'NOT_FOUND'
-    }); // Enhanced debug
+    // Get the context value  
+    const contextSelect = document.querySelector(`[name="context_${trackIndex}"]`);
+    const context = contextSelect ? contextSelect.value.trim() : '';
+    
+    console.log(`🔍 Validating Track Index ${trackIndex} (UI: Track ${trackIndex + 1}): mood="${mood}", context="${context}"`);
     
     let missingFields = [];
     
@@ -304,7 +335,7 @@ function validateCurrentTrack(trackIndex) {
     }
     
     if (missingFields.length > 0) {
-        const message = `Please complete the following for this track:\n• ${missingFields.join('\n• ')}`;
+        const message = `Please complete the following for Track ${trackIndex + 1}:\n• ${missingFields.join('\n• ')}`;
         alert(message);
         return false;
     }
@@ -316,7 +347,8 @@ function validateCurrentTrack(trackIndex) {
 function updateProgress() {
     completedTracks = 0;
     for (let i = 0; i < totalTracks; i++) {
-        const mood = document.getElementById(`mood_${i}`).value;
+        const moodRadio = document.querySelector(`input[name="mood_${i}"]:checked`);
+        const mood = moodRadio ? moodRadio.value : '';
         const context = document.querySelector(`[name="context_${i}"]`).value;
         if (mood && context) {
             completedTracks++;
@@ -331,19 +363,35 @@ function updateProgress() {
 
 
 function submitFeedback() {
+    console.log('🚀 Submitting feedback for all tracks...');
+    
+    // First, let's see what data we actually have for each track
+    for (let i = 0; i < totalTracks; i++) {
+        const moodRadio = document.querySelector(`input[name="mood_${i}"]:checked`);
+        const mood = moodRadio ? moodRadio.value : 'NOT_SELECTED';
+        const context = document.querySelector(`[name="context_${i}"]`) ? document.querySelector(`[name="context_${i}"]`).value : 'INPUT_NOT_FOUND';
+        console.log(`📋 Track ${i} data: mood="${mood}", context="${context}"`);
+    }
+    
     // Validate all tracks
     for (let i = 0; i < totalTracks; i++) {
+        console.log(`🔍 Validating track ${i}...`);
         if (!validateCurrentTrack(i)) {
+            console.log(`❌ Validation failed for track ${i}, stopping submission`);
             return;
         }
+        console.log(`✅ Track ${i} validation passed`);
     }
+    
+    console.log('🎉 All tracks validated successfully!');
     
     // Collect all feedback data
     const feedbackData = [];
     for (let i = 0; i < totalTracks; i++) {
+        const moodRadio = document.querySelector(`input[name="mood_${i}"]:checked`);
         feedbackData.push({
             track_id: parseInt(document.querySelector(`[name="track_id_${i}"]`).value),
-            mood: document.getElementById(`mood_${i}`).value,
+            mood: moodRadio ? moodRadio.value : '',
             context: document.querySelector(`[name="context_${i}"]`).value,
             rating: parseInt(document.getElementById(`rating_${i}`).value),
             soap_notes: document.querySelector(`[name="notes_${i}"]`).value || ""
@@ -433,7 +481,7 @@ function updateDuration(trackIndex) {
     }
 }
 
-function updateProgress(trackIndex) {
+function updateAudioProgress(trackIndex) {
     const audio = document.getElementById(`audio-${trackIndex}`);
     const progressBar = document.getElementById(`audio-progress-${trackIndex}`);
     const currentTimeElement = document.getElementById(`current-time-${trackIndex}`);
@@ -498,29 +546,50 @@ updateProgress();
     text-align: center;
 }
 
-.mood-emoji {
+.mood-option {
     display: inline-block;
-    font-size: 2rem;
-    padding: 10px;
-    margin: 5px;
-    border-radius: 50%;
+    margin: 8px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.mood-option input[type="radio"] {
+    display: none;
+}
+
+.mood-emoji-radio {
+    display: block;
+    font-size: 2rem;
+    padding: 12px;
+    border-radius: 50%;
     background: #ffffff;
-    border: 2px solid transparent;
-    user-select: none;
+    border: 3px solid #e0e0e0;
+    transition: all 0.3s ease;
+    margin-bottom: 5px;
 }
 
-.mood-emoji:hover {
-    background: rgba(102, 126, 234, 0.3);
+.mood-label {
+    display: block;
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+}
+
+.mood-option:hover .mood-emoji-radio {
+    border-color: #667eea;
+    transform: scale(1.05);
+}
+
+.mood-option input[type="radio"]:checked + .mood-emoji-radio {
+    background: #667eea;
+    border-color: #667eea;
     transform: scale(1.1);
+    box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
 }
 
-.mood-emoji.selected {
-    background: #667eea !important;
-    transform: scale(1.2) !important;
-    box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
-    border: 2px solid #ffffff;
+.mood-option input[type="radio"]:checked ~ .mood-label {
+    color: #667eea;
+    font-weight: bold;
 }
 
 .audio-preview-section {
