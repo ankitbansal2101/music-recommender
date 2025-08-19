@@ -1,0 +1,557 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-heart"></i> Your Musical Reactions</h1>
+    <p class="lead">Tell us how these tracks make you feel</p>
+</div>
+
+<div class="row">
+    <div class="col-md-10 mx-auto">
+        <div class="progress-container">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span>Feedback Progress</span>
+                <span id="progress-text">0 of {{ seed_tracks|length }} tracks</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" id="feedback-progress" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <form id="feedback-form">
+            {% for track in seed_tracks %}
+            <div class="card track-card fade-in" id="track-{{ loop.index0 }}" style="{% if loop.index0 > 0 %}display: none;{% endif %}">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h5><i class="fas fa-music"></i> Track {{ loop.index }} of {{ seed_tracks|length }}</h5>
+                            <div class="track-title">
+                                <h6 class="text-light">{{ track.artist|default('Unknown Artist') }} - {{ track.title|default('Track ' + track.track_id|string) }}</h6>
+                            </div>
+                            <div class="track-details">
+                                <strong>ID:</strong> {{ track.track_id }} | 
+                                <strong>Genre:</strong> {{ track.genre }} | 
+                                <strong>Tempo:</strong> {{ "%.0f"|format(track.tempo) }} BPM
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-outline-light btn-sm" onclick="playTrackPreview({{ track.track_id }})">
+                                <i class="fas fa-play"></i> Preview Audio
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Audio Preview Section -->
+                    <div class="audio-preview-section mb-4">
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="audio-player-container" id="audio-container-{{ loop.index0 }}">
+                                    <div class="audio-info">
+                                        <h6><i class="fas fa-headphones"></i> {{ track.artist|default('Unknown Artist') }} - {{ track.title|default('Track ' + track.track_id|string) }}</h6>
+                                        <p class="text-muted mb-2">🎵 <strong>Now Playing:</strong> Track {{ track.track_id }} ({{ track.genre }})</p>
+                                        
+                                        <div class="audio-controls">
+                                            <button class="btn btn-success" onclick="playAudio({{ loop.index0 }}, {{ track.track_id }})">
+                                                <i class="fas fa-play" id="play-icon-{{ loop.index0 }}"></i> Play
+                                            </button>
+                                            <button class="btn btn-warning" onclick="pauseAudio({{ loop.index0 }})">
+                                                <i class="fas fa-pause"></i> Pause
+                                            </button>
+                                            <button class="btn btn-info" onclick="skipAhead({{ loop.index0 }})">
+                                                <i class="fas fa-forward"></i> Skip to 30s
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="audio-progress mt-2">
+                                            <div class="progress">
+                                                <div class="progress-bar" id="audio-progress-{{ loop.index0 }}" style="width: 0%"></div>
+                                            </div>
+                                            <div class="d-flex justify-content-between">
+                                                <small id="current-time-{{ loop.index0 }}">0:00</small>
+                                                <small id="duration-{{ loop.index0 }}">-:--</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <audio id="audio-{{ loop.index0 }}" preload="metadata" onloadedmetadata="updateDuration({{ loop.index0 }})" ontimeupdate="updateProgress({{ loop.index0 }})">
+                                            <source src="/static/audio/{{ track.track_id|string|string + '.mp3' }}" type="audio/mpeg">
+                                            <p class="text-warning">Your browser doesn't support audio playback. Track ID: {{ track.track_id }}</p>
+                                        </audio>
+                                        
+                                        <div class="track-metadata mt-2">
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <small class="text-muted">
+                                                        <strong>Audio Features:</strong><br>
+                                                        Spectral Centroid: {{ "%.0f"|format(track.spectral_centroid) if track.spectral_centroid else 'N/A' }}<br>
+                                                        RMS Energy: {{ "%.3f"|format(track.rms) if track.rms else 'N/A' }}
+                                                    </small>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <small class="text-muted">
+                                                        <strong>Estimated Mood:</strong><br>
+                                                        Valence: {{ "%.2f"|format(track.valence_estimate) }} ({{ "Happy" if track.valence_estimate > 0.6 else "Neutral" if track.valence_estimate > 0.4 else "Sad" }})<br>
+                                                        Energy Level: {{ "High" if track.tempo > 120 else "Medium" if track.tempo > 80 else "Low" }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Feedback Section -->
+                    <div class="row mb-4">
+                        <!-- Mood Selection -->
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-smile"></i> How does this track make you feel?</h6>
+                            <div class="mood-selector mb-3">
+                                {% for mood, emoji in mood_emojis.items() %}
+                                <span class="mood-emoji" data-mood="{{ mood }}" data-track="{{ loop.index0 }}" title="{{ mood.title() }}">
+                                    {{ emoji }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" name="mood_{{ loop.index0 }}" id="mood_{{ loop.index0 }}" required>
+                        </div>
+
+                        <!-- Context Selection -->
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-map-marker-alt"></i> When would you listen to this?</h6>
+                            <select class="form-select mb-3" name="context_{{ loop.index0 }}" required>
+                                <option value="">Choose a context...</option>
+                                <option value="Workout">💪 Workout / Exercise</option>
+                                <option value="Study">📚 Study / Focus</option>
+                                <option value="Party">🎉 Party / Social</option>
+                                <option value="Coffee Shop">☕ Coffee Shop / Cafe</option>
+                                <option value="Meditation">🧘 Meditation / Relaxation</option>
+                                <option value="Driving">🚗 Driving / Commute</option>
+                                <option value="Background">🎵 Background Music</option>
+                                <option value="Late Night">🌙 Late Night / Chill</option>
+                                <option value="Morning">🌅 Morning Routine</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Rating -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <h6><i class="fas fa-star"></i> Overall Rating</h6>
+                            <div class="rating-container">
+                                <input type="range" class="form-range" min="1" max="10" value="5" 
+                                       name="rating_{{ loop.index0 }}" id="rating_{{ loop.index0 }}"
+                                       oninput="updateRatingDisplay({{ loop.index0 }}, this.value)">
+                                <div class="d-flex justify-content-between">
+                                    <small>1 (Hate)</small>
+                                    <span id="rating-display-{{ loop.index0 }}" class="fw-bold">5</span>
+                                    <small>10 (Love)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SOAP Notes -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6><i class="fas fa-comment"></i> Additional Notes (Optional)</h6>
+                            <textarea class="form-control" name="notes_{{ loop.index0 }}" rows="3" 
+                                      placeholder="Tell us more... What does this track remind you of? How does it make you feel? When would you listen to it? Any specific memories or emotions?"></textarea>
+                            <div class="form-text">
+                                Examples: "Reminds me of summer road trips", "Perfect for coding sessions", "Too intense for morning"
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Track Hidden Data -->
+                    <input type="hidden" name="track_id_{{ loop.index0 }}" value="{{ track.track_id }}">
+                </div>
+                
+                <div class="card-footer text-end">
+                    {% if loop.index0 > 0 %}
+                    <button type="button" class="btn btn-outline-secondary" onclick="previousTrack({{ loop.index0 }})">
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </button>
+                    {% endif %}
+                    
+                    {% if loop.index0 < seed_tracks|length - 1 %}
+                    <button type="button" class="btn btn-primary" onclick="nextTrack({{ loop.index0 }})">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-success" onclick="submitFeedback()">
+                        <i class="fas fa-magic"></i> Generate Recommendations
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </form>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="loading">
+                    <i class="fas fa-spinner"></i>
+                    <h5 class="mt-3">Processing Your Feedback</h5>
+                    <p>Creating your personalized music profile...</p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTrack = 0;
+const totalTracks = {{ seed_tracks|length }};
+let completedTracks = 0;
+
+// Update rating display
+function updateRatingDisplay(trackIndex, value) {
+    document.getElementById(`rating-display-${trackIndex}`).textContent = value;
+}
+
+// Mood selection
+document.querySelectorAll('.mood-emoji').forEach(emoji => {
+    emoji.addEventListener('click', function() {
+        const mood = this.dataset.mood;
+        const trackIndex = this.dataset.track;
+        
+        console.log(`Selected mood: ${mood} for track ${trackIndex}`); // Debug
+        
+        // Clear previous selections for this track
+        document.querySelectorAll(`[data-track="${trackIndex}"]`).forEach(e => e.classList.remove('selected'));
+        
+        // Select this emoji
+        this.classList.add('selected');
+        
+        // Set the hidden input value
+        const hiddenInput = document.getElementById(`mood_${trackIndex}`);
+        if (hiddenInput) {
+            hiddenInput.value = mood;
+            console.log(`Set hidden input value: ${hiddenInput.value}`); // Debug
+        } else {
+            console.error(`Hidden input mood_${trackIndex} not found`);
+        }
+        
+        // Show brief confirmation for manual emoji selection
+        const moodSelector = document.querySelector(`#track-${trackIndex} .mood-selector`);
+        if (moodSelector) {
+            moodSelector.style.backgroundColor = '#d1ecf1';
+            moodSelector.style.border = '2px solid #17a2b8';
+            setTimeout(() => {
+                moodSelector.style.backgroundColor = '';
+                moodSelector.style.border = '';
+            }, 1000);
+        }
+        
+        updateProgress();
+    });
+});
+
+// Navigation functions
+function nextTrack(currentIndex) {
+    if (validateCurrentTrack(currentIndex)) {
+        document.getElementById(`track-${currentIndex}`).style.display = 'none';
+        document.getElementById(`track-${currentIndex + 1}`).style.display = 'block';
+        currentTrack = currentIndex + 1;
+        updateProgress();
+    }
+}
+
+function previousTrack(currentIndex) {
+    document.getElementById(`track-${currentIndex}`).style.display = 'none';
+    document.getElementById(`track-${currentIndex - 1}`).style.display = 'block';
+    currentTrack = currentIndex - 1;
+}
+
+function validateCurrentTrack(trackIndex) {
+    const mood = document.getElementById(`mood_${trackIndex}`).value;
+    const context = document.querySelector(`[name="context_${trackIndex}"]`).value;
+    
+    console.log(`Validating track ${trackIndex}:`, { mood, context }); // Debug
+    
+    let missingFields = [];
+    
+    if (!mood || mood === '') {
+        missingFields.push('mood emoji');
+        // Highlight the mood selector to show what's missing
+        const moodSelector = document.querySelector(`#track-${trackIndex} .mood-selector`);
+        if (moodSelector) {
+            moodSelector.style.border = '2px solid #dc3545';
+            setTimeout(() => {
+                moodSelector.style.border = '';
+            }, 3000);
+        }
+    }
+    
+    if (!context || context === '') {
+        missingFields.push('listening context');
+        // Highlight the context selector
+        const contextSelector = document.querySelector(`[name="context_${trackIndex}"]`);
+        if (contextSelector) {
+            contextSelector.style.border = '2px solid #dc3545';
+            setTimeout(() => {
+                contextSelector.style.border = '';
+            }, 3000);
+        }
+    }
+    
+    if (missingFields.length > 0) {
+        const message = `Please complete the following for this track:\n• ${missingFields.join('\n• ')}`;
+        alert(message);
+        return false;
+    }
+    
+    console.log(`✅ Track ${trackIndex} validation passed`); // Debug
+    return true;
+}
+
+function updateProgress() {
+    completedTracks = 0;
+    for (let i = 0; i < totalTracks; i++) {
+        const mood = document.getElementById(`mood_${i}`).value;
+        const context = document.querySelector(`[name="context_${i}"]`).value;
+        if (mood && context) {
+            completedTracks++;
+        }
+    }
+    
+    const progress = (completedTracks / totalTracks) * 100;
+    document.getElementById('feedback-progress').style.width = `${progress}%`;
+    document.getElementById('progress-text').textContent = `${completedTracks} of ${totalTracks} tracks`;
+}
+
+
+
+function submitFeedback() {
+    // Validate all tracks
+    for (let i = 0; i < totalTracks; i++) {
+        if (!validateCurrentTrack(i)) {
+            return;
+        }
+    }
+    
+    // Collect all feedback data
+    const feedbackData = [];
+    for (let i = 0; i < totalTracks; i++) {
+        feedbackData.push({
+            track_id: parseInt(document.querySelector(`[name="track_id_${i}"]`).value),
+            mood: document.getElementById(`mood_${i}`).value,
+            context: document.querySelector(`[name="context_${i}"]`).value,
+            rating: parseInt(document.getElementById(`rating_${i}`).value),
+            soap_notes: document.querySelector(`[name="notes_${i}"]`).value || ""
+        });
+    }
+    
+    // Show loading modal
+    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadingModal.show();
+    
+    // Submit feedback
+    fetch('/api/submit_feedback', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(feedbackData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'processing_started') {
+            // Redirect to processing page
+            window.location.href = '/processing';
+        } else {
+            alert('Error submitting feedback. Please try again.');
+            loadingModal.hide();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error submitting feedback. Please try again.');
+        loadingModal.hide();
+    });
+}
+
+// Audio Control Functions
+let currentlyPlaying = null;
+
+function playAudio(trackIndex, trackId) {
+    // Stop any currently playing audio
+    if (currentlyPlaying !== null && currentlyPlaying !== trackIndex) {
+        pauseAudio(currentlyPlaying);
+    }
+    
+    const audio = document.getElementById(`audio-${trackIndex}`);
+    const playIcon = document.getElementById(`play-icon-${trackIndex}`);
+    
+    if (audio.paused) {
+        audio.play().then(() => {
+            playIcon.className = 'fas fa-pause';
+            currentlyPlaying = trackIndex;
+        }).catch(error => {
+            console.error('Audio playback failed:', error);
+            alert(`Could not play audio file for track ${trackId}. The file may not exist.`);
+        });
+    } else {
+        audio.pause();
+        playIcon.className = 'fas fa-play';
+        currentlyPlaying = null;
+    }
+}
+
+function pauseAudio(trackIndex) {
+    const audio = document.getElementById(`audio-${trackIndex}`);
+    const playIcon = document.getElementById(`play-icon-${trackIndex}`);
+    
+    audio.pause();
+    playIcon.className = 'fas fa-play';
+    if (currentlyPlaying === trackIndex) {
+        currentlyPlaying = null;
+    }
+}
+
+function skipAhead(trackIndex) {
+    const audio = document.getElementById(`audio-${trackIndex}`);
+    audio.currentTime = Math.min(audio.currentTime + 30, audio.duration);
+}
+
+function updateDuration(trackIndex) {
+    const audio = document.getElementById(`audio-${trackIndex}`);
+    const durationElement = document.getElementById(`duration-${trackIndex}`);
+    
+    if (audio.duration && !isNaN(audio.duration)) {
+        const minutes = Math.floor(audio.duration / 60);
+        const seconds = Math.floor(audio.duration % 60);
+        durationElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function updateProgress(trackIndex) {
+    const audio = document.getElementById(`audio-${trackIndex}`);
+    const progressBar = document.getElementById(`audio-progress-${trackIndex}`);
+    const currentTimeElement = document.getElementById(`current-time-${trackIndex}`);
+    
+    if (audio.duration) {
+        const progress = (audio.currentTime / audio.duration) * 100;
+        progressBar.style.width = `${progress}%`;
+        
+        const minutes = Math.floor(audio.currentTime / 60);
+        const seconds = Math.floor(audio.currentTime % 60);
+        currentTimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+    
+    // Auto-pause at end
+    if (audio.ended) {
+        pauseAudio(trackIndex);
+    }
+}
+
+function playTrackPreview(trackId) {
+    alert(`Track ${trackId} preview would open here. In a full implementation, this could:\n\n` +
+          `• Search for the track on Spotify and play a preview\n` +
+          `• Play a local audio file if available\n` +
+          `• Show additional track metadata\n` +
+          `• Display lyrics or artist information`);
+}
+
+
+
+// Initialize
+updateProgress();
+</script>
+
+<style>
+.rating-container {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.form-range::-webkit-slider-thumb {
+    background: #667eea;
+}
+
+.form-range::-moz-range-thumb {
+    background: #667eea;
+    border: none;
+}
+
+.track-info .badge {
+    margin-left: 5px;
+}
+
+.btn-group .btn {
+    font-size: 0.875rem;
+}
+
+.mood-selector {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.mood-emoji:hover {
+    background: rgba(102, 126, 234, 0.3);
+    transform: scale(1.1);
+}
+
+.mood-emoji.selected {
+    background: #667eea !important;
+    transform: scale(1.2) !important;
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+    border: 2px solid #ffffff;
+}
+
+.audio-preview-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    padding: 20px;
+    border-radius: 15px;
+    border: 2px solid #dee2e6;
+}
+
+.audio-player-container {
+    text-align: center;
+}
+
+.audio-controls {
+    margin: 15px 0;
+}
+
+.audio-controls .btn {
+    margin: 0 5px;
+    min-width: 80px;
+}
+
+.audio-progress {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.track-metadata {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.track-details {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 5px;
+}
+
+
+</style>
+{% endblock %}

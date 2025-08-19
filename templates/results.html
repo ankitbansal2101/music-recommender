@@ -1,0 +1,495 @@
+{% extends "base.html" %}
+
+{% block title %}Results - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-trophy"></i> Your Personalized Music Recommendations</h1>
+    <p class="lead">Based on your unique musical taste and preferences</p>
+</div>
+
+<div class="row">
+    <!-- User Profile Summary -->
+    <div class="col-md-4">
+        <div class="card mb-4 fade-in">
+            <div class="card-header">
+                <h5><i class="fas fa-user-circle"></i> Your Musical Profile</h5>
+            </div>
+            <div class="card-body">
+                {% if user_profile.mood_patterns %}
+                <h6>🎭 Top Moods</h6>
+                <div class="mood-patterns mb-3">
+                    {% for mood, stats in user_profile.mood_patterns.items() %}
+                    {% if loop.index <= 3 %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>{{ mood_emojis.get(mood, '🎵') }} {{ mood.title() }}</span>
+                        <span class="badge bg-primary">{{ "%.1f"|format(stats.mean) }}/10</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <h6>📊 Profile Stats</h6>
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <strong>Discovery Style:</strong>
+                        {% set tolerance = user_profile.get('discovery_tolerance', 0.3) %}
+                        {% if tolerance > 0.4 %}
+                            <span class="text-success">Adventurous</span>
+                        {% elif tolerance > 0.25 %}
+                            <span class="text-primary">Balanced</span>
+                        {% else %}
+                            <span class="text-warning">Conservative</span>
+                        {% endif %}
+                    </div>
+                    <div class="stat-item">
+                        <strong>Average Rating:</strong> 
+                        {{ "%.1f"|format(user_profile.get('average_rating', 0)) }}/10
+                    </div>
+                    <div class="stat-item">
+                        <strong>Profile Confidence:</strong> 
+                        {{ "%.0f"|format((user_profile.get('profile_confidence', 0) * 100)) }}%
+                    </div>
+                </div>
+                
+                {% if user_profile.preferences %}
+                <h6 class="mt-3">🎛️ Audio Preferences</h6>
+                <div class="audio-preferences">
+                    {% for feature, pref in user_profile.preferences.items() %}
+                    {% if loop.index <= 3 %}
+                    <div class="preference-item">
+                        <small class="text-muted">{{ feature.replace('_', ' ').title() }}</small>
+                        <div class="progress" style="height: 8px;">
+                            {% set normalized = (pref.preferred_value / 200) if feature == 'tempo' else pref.preferred_value %}
+                            <div class="progress-bar" style="width: {{ (normalized * 100)|int }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Actions Card -->
+        <div class="card mb-4 fade-in">
+            <div class="card-header">
+                <h5><i class="fas fa-tools"></i> Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary" onclick="generatePlaylist()">
+                        <i class="fas fa-robot"></i> Generate AI Playlist
+                    </button>
+                    <button class="btn btn-success" onclick="searchSpotify()">
+                        <i class="fab fa-spotify"></i> Find on Spotify
+                    </button>
+                    <button class="btn btn-info" onclick="createVisualization()">
+                        <i class="fas fa-chart-line"></i> Create Visualization
+                    </button>
+                    <a href="/api/export_results" class="btn btn-outline-secondary">
+                        <i class="fas fa-download"></i> Export Results
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recommendations -->
+    <div class="col-md-8">
+        <div class="card fade-in">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-star"></i> Your Recommendations</h5>
+                <span class="badge bg-success">{{ recommendations|length }} tracks found</span>
+            </div>
+            <div class="card-body">
+                {% for rec in recommendations %}
+                <div class="recommendation-card mb-3" data-track-id="{{ rec.track_id }}">
+                    <div class="row align-items-center">
+                        <div class="col-md-1">
+                            <div class="rank-badge">
+                                {{ loop.index }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-1">Track {{ rec.track_id }}</h6>
+                            <div class="track-details">
+                                <span class="badge bg-secondary">{{ rec.genre }}</span>
+                                <small class="text-muted ms-2">
+                                    {{ "%.0f"|format(rec.tempo) }} BPM • 
+                                    Valence: {{ "%.2f"|format(rec.valence_estimate) }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="score-display">
+                                <div class="score-circle">
+                                    {{ "%.0f"|format(rec.discovery_score * 100) }}
+                                </div>
+                                <small class="text-muted">Discovery Score</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2 text-end">
+                            <div class="btn-group-vertical btn-group-sm">
+                                <button class="btn btn-outline-success btn-sm" 
+                                        onclick="showExplanation({{ loop.index0 }})"
+                                        data-bs-toggle="tooltip" title="Why recommended?">
+                                    <i class="fas fa-question-circle"></i>
+                                </button>
+                                <button class="btn btn-outline-primary btn-sm spotify-btn"
+                                        data-track-id="{{ rec.track_id }}"
+                                        data-bs-toggle="tooltip" title="Find on Spotify"
+                                        style="display: none;">
+                                    <i class="fab fa-spotify"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden explanation -->
+                    <div class="explanation-panel" id="explanation-{{ loop.index0 }}" style="display: none;">
+                        <div class="alert alert-info mt-2">
+                            <small>
+                                <strong>Why this track?</strong><br>
+                                {{ rec.explanation }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Seed Tracks Reference -->
+        <div class="card mt-4 fade-in">
+            <div class="card-header">
+                <h5><i class="fas fa-seedling"></i> Your Seed Tracks (For Reference)</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for track in seed_tracks %}
+                    <div class="col-md-6 mb-2">
+                        <div class="seed-track-item">
+                            <strong>Track {{ track.track_id }}</strong>
+                            <span class="badge bg-info ms-2">{{ track.genre }}</span>
+                            <br>
+                            <small class="text-muted">
+                                {{ "%.0f"|format(track.tempo) }} BPM • 
+                                Valence: {{ "%.2f"|format(track.valence_estimate) }}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Modals -->
+<div class="modal fade" id="playlistModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-robot"></i> AI-Generated Playlist</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="playlist-content">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2">Generating your playlist concept...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="spotifyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fab fa-spotify"></i> Spotify Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="spotify-content">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2">Searching on Spotify...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="visualModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-chart-line"></i> Visualization</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="visual-content">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2">Creating visualization...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize tooltips
+const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+tooltips.forEach(tooltip => new bootstrap.Tooltip(tooltip));
+
+function showExplanation(index) {
+    const panel = document.getElementById(`explanation-${index}`);
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+function generatePlaylist() {
+    const modal = new bootstrap.Modal(document.getElementById('playlistModal'));
+    modal.show();
+    
+    fetch('/api/generate_playlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('playlist-content').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> ${data.error}
+                </div>
+            `;
+        } else {
+            document.getElementById('playlist-content').innerHTML = `
+                <div class="text-center mb-4">
+                    <h3 class="text-primary">"${data.title}"</h3>
+                    <p class="lead">${data.description}</p>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-map-marker-alt"></i> Perfect For:</h6>
+                        <ul class="list-unstyled">
+                            ${data.contexts.map(ctx => `<li><i class="fas fa-check text-success"></i> ${ctx}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-hashtag"></i> Hashtags:</h6>
+                        <div>
+                            ${data.hashtags.map(tag => `<span class="badge bg-primary me-1">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="alert alert-light mt-3">
+                    <h6><i class="fas fa-quote-left"></i> Vibe Statement:</h6>
+                    <p class="mb-0 fst-italic">"${data.vibe_statement}"</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        document.getElementById('playlist-content').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Error generating playlist: ${error.message}
+            </div>
+        `;
+    });
+}
+
+function searchSpotify() {
+    const modal = new bootstrap.Modal(document.getElementById('spotifyModal'));
+    modal.show();
+    
+    fetch('/api/search_spotify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('spotify-content').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> ${data.error}
+                </div>
+            `;
+        } else if (data.length === 0) {
+            document.getElementById('spotify-content').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-search"></i> No matches found on Spotify. The tracks might not be available on the platform.
+                </div>
+            `;
+        } else {
+            let content = '<div class="spotify-results">';
+            data.forEach((track, index) => {
+                content += `
+                    <div class="spotify-track-card mb-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="mb-1">${track.artist} - ${track.title}</h6>
+                                <small class="text-muted">FMA Track: ${track.fma_id}</small>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <a href="${track.spotify_url}" target="_blank" class="btn btn-success btn-sm">
+                                    <i class="fab fa-spotify"></i> Open in Spotify
+                                </a>
+                                ${track.preview_url ? `
+                                <button class="btn btn-outline-primary btn-sm ms-1" onclick="playPreview('${track.preview_url}')">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            content += '</div>';
+            document.getElementById('spotify-content').innerHTML = content;
+            
+            // Show Spotify buttons in main list
+            data.forEach(track => {
+                const btn = document.querySelector(`[data-track-id="${track.fma_id}"]`);
+                if (btn) {
+                    btn.style.display = 'block';
+                    btn.onclick = () => window.open(track.spotify_url, '_blank');
+                }
+            });
+        }
+    })
+    .catch(error => {
+        document.getElementById('spotify-content').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Error searching Spotify: ${error.message}
+            </div>
+        `;
+    });
+}
+
+function createVisualization() {
+    const modal = new bootstrap.Modal(document.getElementById('visualModal'));
+    modal.show();
+    
+    fetch('/api/create_visualization')
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('visual-content').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> ${data.error}
+                </div>
+            `;
+        } else {
+            document.getElementById('visual-content').innerHTML = `
+                <div class="text-center">
+                    <img src="${data.image}" class="img-fluid" alt="Music Analysis Visualization">
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        document.getElementById('visual-content').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Error creating visualization: ${error.message}
+            </div>
+        `;
+    });
+}
+
+let currentAudio = null;
+
+function playPreview(url) {
+    if (currentAudio) {
+        currentAudio.pause();
+    }
+    currentAudio = new Audio(url);
+    currentAudio.play();
+}
+</script>
+
+<style>
+.recommendation-card {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.recommendation-card:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+}
+
+.rank-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.score-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 0 auto;
+}
+
+.mood-patterns .badge {
+    font-size: 0.875rem;
+}
+
+.profile-stats .stat-item {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.preference-item {
+    margin-bottom: 10px;
+}
+
+.seed-track-item {
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.spotify-track-card {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.progress {
+    height: 8px;
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.progress-bar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+</style>
+{% endblock %}

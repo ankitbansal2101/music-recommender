@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-music"></i> Enhanced Music Recommender</h1>
+    <p class="lead">Discover your perfect playlist with AI-powered recommendations</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card fade-in">
+            <div class="card-body text-center">
+                <h3>🎧 Welcome to Your Personal Music Journey</h3>
+                <p class="mb-4">
+                    Our advanced system combines human feedback with AI to create truly personalized music recommendations.
+                    Using emoji reactions, natural language feedback, and cutting-edge audio analysis.
+                </p>
+                
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                            <h5>AI-Powered Analysis</h5>
+                            <p>Advanced audio feature extraction and machine learning</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fas fa-heart fa-3x text-danger mb-3"></i>
+                            <h5>Human-Centered</h5>
+                            <p>Emoji feedback and natural language responses</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fab fa-spotify fa-3x text-success mb-3"></i>
+                            <h5>Platform Integration</h5>
+                            <p>Export to Spotify and other streaming services</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="system-stats mb-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="stat-card">
+                                <h4 class="text-primary">{{ total_tracks }}</h4>
+                                <p>Available Tracks</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="stat-card">
+                                <h4 class="text-success">100%</h4>
+                                <p>Personalized</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <a href="{{ url_for('configure') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-play"></i> Start Your Music Journey
+                </a>
+            </div>
+        </div>
+        
+        <div class="card mt-4 fade-in">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> How It Works</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-cog fa-2x text-primary"></i>
+                        </div>
+                        <h6>1. Configure</h6>
+                        <p>Set your preferences and enable integrations</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-music fa-2x text-info"></i>
+                        </div>
+                        <h6>2. Listen</h6>
+                        <p>We'll select diverse seed tracks for you</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-smile fa-2x text-warning"></i>
+                        </div>
+                        <h6>3. React</h6>
+                        <p>Give feedback with emojis and comments</p>
+                    </div>
+                    <div class="col-md-3 text-center">
+                        <div class="step-icon">
+                            <i class="fas fa-magic fa-2x text-success"></i>
+                        </div>
+                        <h6>4. Discover</h6>
+                        <p>Get personalized recommendations and playlists</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.feature-box {
+    padding: 20px;
+    height: 100%;
+}
+
+.stat-card {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.step-icon {
+    margin-bottom: 15px;
+}
+
+.step-icon i {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 15px;
+    border-radius: 50%;
+}
+</style>
+{% endblock %}

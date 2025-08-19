@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Error - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card fade-in">
+            <div class="card-body text-center">
+                <i class="fas fa-exclamation-triangle fa-4x text-warning mb-4"></i>
+                <h2>System Error</h2>
+                <p class="lead text-muted">{{ error }}</p>
+                
+                <div class="mt-4">
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">
+                        <i class="fas fa-home"></i> Return Home
+                    </a>
+                </div>
+                
+                <div class="alert alert-info mt-4">
+                    <h6><i class="fas fa-info-circle"></i> Common Solutions:</h6>
+                    <ul class="text-start">
+                        <li>Check that the FMA dataset is in the correct location</li>
+                        <li>Ensure all required packages are installed: <code>pip install -r requirements.txt</code></li>
+                        <li>Verify that audio files are accessible</li>
+                        <li>Check the console for detailed error messages</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

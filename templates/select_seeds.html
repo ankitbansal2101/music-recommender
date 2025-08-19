@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Selecting Seeds - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-seedling"></i> Selecting Your Seed Tracks</h1>
+    <p class="lead">We're finding diverse tracks to understand your musical taste</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card fade-in">
+            <div class="card-body text-center">
+                <div class="loading-container">
+                    <div class="spinner-container mb-4">
+                        <i class="fas fa-music fa-spin fa-4x text-primary"></i>
+                    </div>
+                    
+                    <h4 id="status-text">Analyzing Music Library...</h4>
+                    <p class="text-muted">Finding tracks that span different genres and styles</p>
+                    
+                    <div class="progress mb-4">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             style="width: 100%"></div>
+                    </div>
+                    
+                    <div class="seeds-preview" id="seeds-preview" style="display: none;">
+                        <h5>Selected Tracks:</h5>
+                        <div id="seed-list" class="row"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const sessionId = '{{ session_id }}';
+let pollInterval;
+
+function checkProgress() {
+    fetch(`/api/progress/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'seeds_selected') {
+                document.getElementById('status-text').textContent = 'Seeds Selected!';
+                
+                // Get the selected seeds
+                fetch(`/api/seeds/${sessionId}`)
+                    .then(response => response.json())
+                    .then(seeds => {
+                        if (seeds.length > 0) {
+                            displaySeeds(seeds);
+                            setTimeout(() => {
+                                window.location.href = '/feedback';
+                            }, 3000);
+                        }
+                    });
+                
+                clearInterval(pollInterval);
+            } else if (data.status === 'error') {
+                document.getElementById('status-text').textContent = 'Error occurred';
+                clearInterval(pollInterval);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function displaySeeds(seeds) {
+    const preview = document.getElementById('seeds-preview');
+    const seedList = document.getElementById('seed-list');
+    
+    let html = '';
+    seeds.forEach((seed, index) => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="seed-card">
+                    <h6>Track ${index + 1}</h6>
+                    <div class="badge bg-primary">${seed.genre}</div>
+                    <div class="badge bg-info ms-1">${Math.round(seed.tempo)} BPM</div>
+                    <br>
+                    <small class="text-muted">Valence: ${seed.valence_estimate.toFixed(2)}</small>
+                </div>
+            </div>
+        `;
+    });
+    
+    seedList.innerHTML = html;
+    preview.style.display = 'block';
+}
+
+// Start polling
+pollInterval = setInterval(checkProgress, 1000);
+checkProgress(); // Initial call
+</script>
+
+<style>
+.loading-container {
+    padding: 40px 20px;
+}
+
+.spinner-container {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.seed-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    border: 2px solid #e9ecef;
+}
+
+.seeds-preview {
+    margin-top: 30px;
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}

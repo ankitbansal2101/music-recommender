@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block title %}Processing - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-cogs"></i> Creating Your Musical Profile</h1>
+    <p class="lead">Analyzing your feedback and generating personalized recommendations</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card fade-in">
+            <div class="card-body text-center">
+                <div class="loading-container">
+                    <div class="spinner-container mb-4">
+                        <i class="fas fa-spinner fa-spin fa-4x text-primary"></i>
+                    </div>
+                    
+                    <h4 id="status-text">Initializing...</h4>
+                    <p id="status-description" class="text-muted">Getting ready to process your feedback</p>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress mb-4" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="progress-bar" style="width: 0%">
+                            <span id="progress-text">0%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Processing Steps -->
+                    <div class="processing-steps">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="step-card" id="step-1">
+                                    <i class="fas fa-heart fa-2x mb-2"></i>
+                                    <h6>Analyzing Feedback</h6>
+                                    <div class="step-status">
+                                        <i class="fas fa-clock text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="step-card" id="step-2">
+                                    <i class="fas fa-user fa-2x mb-2"></i>
+                                    <h6>Building Profile</h6>
+                                    <div class="step-status">
+                                        <i class="fas fa-clock text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="step-card" id="step-3">
+                                    <i class="fas fa-search fa-2x mb-2"></i>
+                                    <h6>Finding Matches</h6>
+                                    <div class="step-status">
+                                        <i class="fas fa-clock text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="step-card" id="step-4">
+                                    <i class="fas fa-magic fa-2x mb-2"></i>
+                                    <h6>Generating Results</h6>
+                                    <div class="step-status">
+                                        <i class="fas fa-clock text-muted"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fun Facts -->
+                    <div class="fun-facts mt-4">
+                        <div class="alert alert-light">
+                            <h6><i class="fas fa-lightbulb"></i> Did You Know?</h6>
+                            <p id="fun-fact" class="mb-0">We analyze over 25 different audio features for each track...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const sessionId = '{{ session_id }}';
+let pollInterval;
+
+const statusMessages = {
+    'processing_feedback': {
+        title: 'Analyzing Your Feedback',
+        description: 'Processing your emoji reactions and notes...',
+        progress: 20
+    },
+    'building_profile': {
+        title: 'Building Your Musical Profile',
+        description: 'Creating your personalized preference model...',
+        progress: 40
+    },
+    'generating_discovery': {
+        title: 'Finding Discovery Tracks',
+        description: 'Searching through our music library for perfect matches...',
+        progress: 60
+    },
+    'generating_recommendations': {
+        title: 'Generating Recommendations',
+        description: 'Balancing familiarity with discovery to create your perfect playlist...',
+        progress: 80
+    },
+    'complete': {
+        title: 'Complete!',
+        description: 'Your personalized recommendations are ready!',
+        progress: 100
+    }
+};
+
+const funFacts = [
+    "We analyze over 25 different audio features for each track including tempo, valence, and MFCC coefficients.",
+    "Our system uses machine learning to balance similarity with discovery - finding the sweet spot between familiar and new.",
+    "Each emoji reaction helps train our understanding of your musical personality and preferences.",
+    "The valence feature measures how happy or sad a song sounds, helping us match your mood.",
+    "We simulate trending music patterns to keep your recommendations fresh and culturally relevant.",
+    "Your SOAP-style notes are analyzed using natural language processing to understand context and emotion.",
+    "The system creates clusters of similar music based on 13 MFCC coefficients that capture timbral characteristics."
+];
+
+let factIndex = 0;
+
+function updateProgress() {
+    fetch(`/api/progress/${sessionId}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Progress update:', data);
+            
+            if (data.status === 'error') {
+                document.getElementById('status-text').textContent = 'Error occurred';
+                document.getElementById('status-description').textContent = data.error || 'Unknown error';
+                clearInterval(pollInterval);
+                return;
+            }
+            
+            if (data.status === 'complete') {
+                document.getElementById('status-text').textContent = 'Complete!';
+                document.getElementById('status-description').textContent = 'Redirecting to your results...';
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('progress-text').textContent = '100%';
+                
+                // Update final step
+                updateStepStatus(4, 'complete');
+                
+                clearInterval(pollInterval);
+                
+                // Redirect after a short delay
+                setTimeout(() => {
+                    window.location.href = '/results';
+                }, 2000);
+                return;
+            }
+            
+            // Update status if we have a matching message
+            if (statusMessages[data.status]) {
+                const status = statusMessages[data.status];
+                document.getElementById('status-text').textContent = status.title;
+                document.getElementById('status-description').textContent = status.description;
+                
+                const progress = data.progress || status.progress;
+                document.getElementById('progress-bar').style.width = `${progress}%`;
+                document.getElementById('progress-text').textContent = `${progress}%`;
+                
+                // Update step status
+                updateStepStatusFromProgress(progress);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching progress:', error);
+        });
+}
+
+function updateStepStatusFromProgress(progress) {
+    if (progress >= 20) updateStepStatus(1, 'complete');
+    if (progress >= 40) updateStepStatus(2, 'complete');
+    if (progress >= 60) updateStepStatus(3, 'complete');
+    if (progress >= 80) updateStepStatus(4, 'active');
+    if (progress >= 100) updateStepStatus(4, 'complete');
+}
+
+function updateStepStatus(stepNumber, status) {
+    const stepCard = document.getElementById(`step-${stepNumber}`);
+    const statusIcon = stepCard.querySelector('.step-status i');
+    
+    stepCard.classList.remove('active', 'complete');
+    
+    if (status === 'active') {
+        stepCard.classList.add('active');
+        statusIcon.className = 'fas fa-spinner fa-spin text-primary';
+    } else if (status === 'complete') {
+        stepCard.classList.add('complete');
+        statusIcon.className = 'fas fa-check-circle text-success';
+    }
+}
+
+function rotateFunFacts() {
+    const factElement = document.getElementById('fun-fact');
+    factElement.style.opacity = '0.5';
+    
+    setTimeout(() => {
+        factElement.textContent = funFacts[factIndex];
+        factElement.style.opacity = '1';
+        factIndex = (factIndex + 1) % funFacts.length;
+    }, 500);
+}
+
+// Start polling for progress
+updateProgress(); // Initial call
+pollInterval = setInterval(updateProgress, 2000); // Poll every 2 seconds
+
+// Rotate fun facts every 4 seconds
+setInterval(rotateFunFacts, 4000);
+</script>
+
+<style>
+.loading-container {
+    padding: 40px 20px;
+}
+
+.spinner-container {
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.processing-steps {
+    margin: 30px 0;
+}
+
+.step-card {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.step-card i:first-child {
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.step-card.active {
+    background: rgba(102, 126, 234, 0.1);
+    border: 2px solid #667eea;
+}
+
+.step-card.active i:first-child {
+    color: #667eea;
+}
+
+.step-card.complete {
+    background: rgba(40, 167, 69, 0.1);
+    border: 2px solid #28a745;
+}
+
+.step-card.complete i:first-child {
+    color: #28a745;
+}
+
+.step-status {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.progress {
+    background: rgba(102, 126, 234, 0.1);
+}
+
+.progress-bar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.fun-facts {
+    transition: opacity 0.5s ease;
+}
+
+.alert-light {
+    background-color: rgba(102, 126, 234, 0.05);
+    border-color: rgba(102, 126, 234, 0.1);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.step-card.active {
+    animation: pulse 2s infinite;
+}
+</style>
+{% endblock %}

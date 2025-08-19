@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Configure - Enhanced Music Recommender{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1><i class="fas fa-cogs"></i> System Configuration</h1>
+    <p class="lead">Customize your music recommendation experience</p>
+</div>
+
+<form method="POST" action="{{ url_for('configure') }}">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            
+            <!-- Basic Settings -->
+            <div class="card mb-4 fade-in">
+                <div class="card-header">
+                    <h5><i class="fas fa-sliders-h"></i> Basic Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="seed_count" class="form-label">Number of Seed Tracks</label>
+                                <select class="form-select" id="seed_count" name="seed_count" required>
+                                    <option value="4">4 tracks (Quick)</option>
+                                    <option value="6" selected>6 tracks (Recommended)</option>
+                                    <option value="8">8 tracks (Detailed)</option>
+                                    <option value="10">10 tracks (Comprehensive)</option>
+                                </select>
+                                <div class="form-text">More tracks = better profile but longer feedback time</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="discovery_pool_size" class="form-label">Discovery Pool Size</label>
+                                <select class="form-select" id="discovery_pool_size" name="discovery_pool_size" required>
+                                    <option value="50">50 tracks (Fast)</option>
+                                    <option value="100" selected>100 tracks (Balanced)</option>
+                                    <option value="200">200 tracks (Thorough)</option>
+                                    <option value="500">500 tracks (Comprehensive)</option>
+                                </select>
+                                <div class="form-text">Larger pool = more diverse recommendations</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="top_recommendations" class="form-label">Final Recommendations</label>
+                                <select class="form-select" id="top_recommendations" name="top_recommendations" required>
+                                    <option value="5">5 recommendations</option>
+                                    <option value="10" selected>10 recommendations</option>
+                                    <option value="15">15 recommendations</option>
+                                    <option value="20">20 recommendations</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="feedback_type" class="form-label">Feedback Style</label>
+                                <select class="form-select" id="feedback_type" name="feedback_type" required>
+                                    <option value="interactive" selected>Interactive (Full Experience)</option>
+                                    <option value="quick">Quick (Emoji Only)</option>
+                                    <option value="detailed">Detailed (Extended Notes)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API Integrations -->
+            <div class="card mb-4 fade-in">
+                <div class="card-header">
+                    <h5><i class="fas fa-plug"></i> API Integrations</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable_spotify" name="enable_spotify" 
+                                       {% if api_status.spotify %}checked{% endif %}
+                                       {% if not api_status.spotify %}disabled{% endif %}>
+                                <label class="form-check-label" for="enable_spotify">
+                                    <i class="fab fa-spotify text-success"></i> Enable Spotify Integration
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                {% if api_status.spotify %}
+                                    <span class="text-success">✅ Spotify credentials configured</span>
+                                {% else %}
+                                    <span class="text-warning">⚠️ Spotify credentials needed in .env file</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable_gpt" name="enable_gpt"
+                                       {% if api_status.openai %}checked{% endif %}
+                                       {% if not api_status.openai %}disabled{% endif %}>
+                                <label class="form-check-label" for="enable_gpt">
+                                    <i class="fas fa-robot text-primary"></i> Enable GPT Playlist Generation
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                {% if api_status.openai %}
+                                    <span class="text-success">✅ OpenAI credentials configured</span>
+                                {% else %}
+                                    <span class="text-warning">⚠️ OpenAI credentials needed in .env file</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>API Setup:</strong> To enable integrations, add your credentials to the .env file:
+                        <ul class="mb-0 mt-2">
+                            <li><code>SPOTIFY_CLIENT_ID=your_client_id</code></li>
+                            <li><code>SPOTIFY_CLIENT_SECRET=your_client_secret</code></li>
+                            <li><code>OPENAI_API_KEY=your_openai_key</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Advanced Options -->
+            <div class="card mb-4 fade-in">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> Advanced Options</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-light">
+                        <h6><i class="fas fa-lightbulb"></i> Recommendation Algorithm</h6>
+                        <p class="mb-0">
+                            Our system uses a hybrid approach combining:
+                        </p>
+                        <ul class="mb-0">
+                            <li><strong>Content-based filtering</strong> - Audio feature analysis (MFCC, tempo, valence)</li>
+                            <li><strong>Human feedback integration</strong> - Emoji reactions and natural language notes</li>
+                            <li><strong>Discovery balancing</strong> - Mix of familiar and boundary-pushing recommendations</li>
+                            <li><strong>Trending integration</strong> - Simulated popular track injection</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary btn-lg me-3">
+                    <i class="fas fa-rocket"></i> Start Music Analysis
+                </button>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<style>
+.form-check-input:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+.alert-light {
+    background-color: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.2);
+}
+
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}
